@@ -32,15 +32,15 @@ public class FileController {
 
             /* ---------- libreoffice command ---------- */
 
-            ProcessBuilder pb = new ProcessBuilder(
-                    "soffice",
-                    "--headless",
-                    "--convert-to",
-                    format.toLowerCase(),
-                    tempFile.getAbsolutePath(),
-                    "--outdir",
-                    tempFile.getParent()
-            );
+           ProcessBuilder pb = new ProcessBuilder(
+        "soffice",
+        "--headless",
+        "--convert-to",
+        format.toLowerCase(),
+        tempFile.getAbsolutePath(),
+        "--outdir",
+        tempFile.getParent()
+);
 
             pb.redirectErrorStream(true);
 
