@@ -8,10 +8,7 @@ import java.io.*;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = {
-        "http://localhost:4200",
-        "http://127.0.0.1:4200"
-})
+@CrossOrigin(origins = {"*"})
 public class FileController {
 
     @PostMapping("/convert")
