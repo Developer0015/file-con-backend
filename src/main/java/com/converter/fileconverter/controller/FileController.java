@@ -1,6 +1,6 @@
 package com.converter.fileconverter.controller;
 
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -8,11 +8,11 @@ import java.io.*;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = {"*"})
+@CrossOrigin(origins = "*")
 public class FileController {
 
     @PostMapping("/convert")
-    public ResponseEntity<byte[]> convertFile(
+    public ResponseEntity<?> convertFile(
             @RequestParam("file") MultipartFile file,
             @RequestParam("format") String format
     ) {
@@ -21,30 +21,33 @@ public class FileController {
 
             String originalName = file.getOriginalFilename();
 
-            if (originalName == null) {
-                return ResponseEntity.badRequest().build();
+            if (originalName == null || !originalName.contains(".")) {
+                return ResponseEntity.badRequest().body("Invalid file");
             }
 
-            /* ---------- create temp file safely ---------- */
+            String baseName = originalName.substring(0, originalName.lastIndexOf("."));
+
+            /* ---------- create temp file ---------- */
 
             File tempFile = File.createTempFile("upload-", "-" + originalName);
             file.transferTo(tempFile);
 
-            /* ---------- libreoffice command ---------- */
+            /* ---------- run LibreOffice ---------- */
 
-           ProcessBuilder pb = new ProcessBuilder(
-        "soffice",
-        "--headless",
-        "--convert-to",
-        format.toLowerCase(),
-        tempFile.getAbsolutePath(),
-        "--outdir",
-        tempFile.getParent()
-);
+            ProcessBuilder pb = new ProcessBuilder(
+                    "libreoffice",   // 🔥 FIXED (important)
+                    "--headless",
+                    "--convert-to",
+                    format.toLowerCase(),
+                    "--outdir",
+                    tempFile.getParent(),
+                    tempFile.getAbsolutePath()
+            );
 
             pb.redirectErrorStream(true);
 
             Process process = pb.start();
+
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream())
             );
@@ -55,24 +58,20 @@ public class FileController {
             }
 
             int exitCode = process.waitFor();
-            System.out.println("LibreOffice exit code: " + exitCode);
+            System.out.println("Exit code: " + exitCode);
 
-            /* ---------- detect converted file ---------- */
+            /* ---------- exact output file ---------- */
 
-            File dir = new File(tempFile.getParent());
-
-            File[] convertedFiles = dir.listFiles((d, name) ->
-                    name.endsWith("." + format.toLowerCase())
+            File converted = new File(
+                    tempFile.getParent(),
+                    baseName + "." + format.toLowerCase()
             );
 
-            if (convertedFiles == null || convertedFiles.length == 0) {
-                System.out.println("Conversion failed: output file not created");
-                return ResponseEntity.status(500).build();
+            if (!converted.exists()) {
+                return ResponseEntity.status(500).body("Conversion failed");
             }
 
-            File converted = convertedFiles[0];
-
-            /* ---------- read converted file ---------- */
+            /* ---------- read file ---------- */
 
             byte[] output;
 
@@ -85,20 +84,19 @@ public class FileController {
             tempFile.delete();
             converted.delete();
 
-            /* ---------- return converted file ---------- */
+            /* ---------- return ---------- */
 
             return ResponseEntity.ok()
                     .header(
                             "Content-Disposition",
                             "attachment; filename=converted." + format.toLowerCase()
                     )
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .body(output);
 
         } catch (Exception e) {
-
             e.printStackTrace();
-            return ResponseEntity.status(500).build();
-
+            return ResponseEntity.status(500).body("Server error");
         }
     }
 }
